@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { FiFileText } from 'react-icons/fi'
 import ResumeForm from './components/ResumeForm'
 import ResumePreview from './components/ResumePreview'
 import './App.css'
@@ -169,8 +170,15 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>📄 Resume Builder</h1>
-        <p>Create your professional resume dynamically</p>
+        <div className="app-header-brand">
+          <div className="app-header-logo">
+            <FiFileText />
+          </div>
+          <div className="app-header-text">
+            <h1>Resume Builder</h1>
+            <p>Build & preview your resume in real time</p>
+          </div>
+        </div>
       </header>
       <div className="app-container">
         <div className="form-section">

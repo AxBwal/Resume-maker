@@ -125,10 +125,11 @@ function ProjectsForm({ data, updateData }) {
               <div className="form-group">
                 <label>Description (one bullet point per line)</label>
                 <textarea
+                  className="description-textarea"
                   value={project.description || ''}
                   onChange={(e) => updateProject(idx, 'description', e.target.value)}
                   placeholder="• Developed a full-stack web application&#10;• Implemented GitHub OAuth&#10;• Visualized GitHub data"
-                  rows={6}
+                  rows={10}
                 />
               </div>
             </div>

@@ -133,10 +133,11 @@ function ExperienceForm({ data, updateData }) {
               <div className="form-group">
                 <label>Description (one bullet point per line)</label>
                 <textarea
+                  className="description-textarea"
                   value={exp.description || ''}
                   onChange={(e) => updateExperience(idx, 'description', e.target.value)}
                   placeholder="• Developed a REST API using FastAPI&#10;• Implemented new features&#10;• Collaborated with team members"
-                  rows={6}
+                  rows={10}
                 />
               </div>
             </div>
