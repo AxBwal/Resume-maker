@@ -231,8 +231,8 @@ function ResumePreview({ resumeData, sectionOrder }) {
     pdf.setFontSize(22);
     pdf.setFont("helvetica", "bold");
     pdf.text(fullName, pageWidth / 2, yPos, { align: "center" });
-    // CSS: resume-name line-height: 1.2, margin-bottom: 0.2em at 22pt
-    yPos += 22 * 1.2 * 0.352778 + emToMm(0.2, 22);
+    // CSS: resume-name line-height: 1.1, margin-bottom: 0.05em at 22pt
+    yPos += 22 * 1.1 * 0.352778 + emToMm(0.05, 22);
 
     // Contact Information
     const pdfContactItems = buildContactItems(resumeData.personalInfo);
@@ -265,8 +265,8 @@ function ResumePreview({ resumeData, sectionOrder }) {
         }
       });
 
-      // CSS: contact-info has line-height: 1.4 (not 1.15)
-      yPos += 10 * 1.4 * 0.352778; // 10pt font * 1.4 line-height
+      // CSS: contact-info line-height: 1.15
+      yPos += 10 * 1.15 * 0.352778; // 10pt font * 1.15 line-height
     }
 
     // CSS: resume-header margin-bottom: 0.6em at 11pt = 0.6 * 11pt = 6.6pt ≈ 2.33mm
