@@ -89,6 +89,110 @@ function ResumePreview({ resumeData, sectionOrder }) {
       return fontSize * 1.15 * 0.352778; // line-height: 1.15
     };
 
+    const getTextWidthMm = (text, fontStyle = "normal", fontSize = 11) => {
+      pdf.setFontSize(fontSize);
+      pdf.setFont("helvetica", fontStyle);
+      return pdf.getTextWidth(text);
+    };
+
+    // First line reserves space for a right-aligned label; continuations use full width
+    const splitWithRightColumn = (
+      text,
+      firstLineWidth,
+      fullLineWidth,
+      bold = false,
+    ) => {
+      if (!text) return [];
+      const fontStyle = bold ? "bold" : "normal";
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", fontStyle);
+
+      const words = text.split(/\s+/);
+      let firstLine = "";
+      let wordIndex = 0;
+
+      for (; wordIndex < words.length; wordIndex++) {
+        const candidate = firstLine
+          ? `${firstLine} ${words[wordIndex]}`
+          : words[wordIndex];
+        if (firstLine && getTextWidthMm(candidate, fontStyle) > firstLineWidth) {
+          break;
+        }
+        firstLine = candidate;
+      }
+
+      const remainder = words.slice(wordIndex).join(" ");
+      const restLines = remainder
+        ? pdf.splitTextToSize(remainder, fullLineWidth)
+        : [];
+
+      return [firstLine, ...restLines].filter(Boolean);
+    };
+
+    const addLeftRightRows = (
+      leftText,
+      rightText,
+      { bold = false, afterSpacingEm = 0.1 } = {},
+    ) => {
+      pdf.setFontSize(11);
+      const trimmedLeft = (leftText || "").trim();
+      const trimmedRight = (rightText || "").trim();
+      const rightColWidth = trimmedRight
+        ? getTextWidthMm(trimmedRight) + emToMm(0.4)
+        : 0;
+      const firstLineWidth = maxWidth - rightColWidth;
+      const leftLines = splitWithRightColumn(
+        trimmedLeft,
+        firstLineWidth,
+        maxWidth,
+        bold,
+      );
+
+      leftLines.forEach((line, lineIdx) => {
+        checkPageBreak(getLineHeight());
+        pdf.setFont("helvetica", bold ? "bold" : "normal");
+        pdf.text(line, margin, yPos);
+        if (lineIdx === 0 && trimmedRight) {
+          pdf.setFont("helvetica", "normal");
+          pdf.text(trimmedRight, pageWidth - margin, yPos, { align: "right" });
+        }
+        yPos += getLineHeight();
+      });
+
+      yPos += emToMm(afterSpacingEm);
+    };
+
+    const addBulletList = (description) => {
+      const bulletIndent = emToMm(1.0);
+      const bulletPrefix = "• ";
+      const textStartX =
+        margin + bulletIndent + getTextWidthMm(bulletPrefix);
+      const textMaxWidth = pageWidth - margin - textStartX;
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "normal");
+
+      description
+        .split("\n")
+        .filter((line) => line.trim())
+        .forEach((line) => {
+          const cleanLine = line.trim().replace(/^[-•]\s*/, "");
+          const wrappedLines = pdf.splitTextToSize(cleanLine, textMaxWidth);
+
+          wrappedLines.forEach((textLine, lineIdx) => {
+            checkPageBreak(getLineHeight());
+            if (lineIdx === 0) {
+              pdf.text(bulletPrefix + textLine, margin + bulletIndent, yPos);
+            } else {
+              pdf.text(textLine, textStartX, yPos);
+            }
+            yPos += getLineHeight() + emToMm(0.05);
+          });
+        });
+
+      yPos += emToMm(0.15);
+    };
+
     // Header Section
     const fullName = resumeData.personalInfo.fullName || "Your Name";
     checkPageBreak(10);
@@ -213,38 +317,18 @@ function ResumePreview({ resumeData, sectionOrder }) {
           checkPageBreak(15);
 
           // Title and Date - CSS: margin-bottom: 0.1em
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(11);
-          pdf.text(exp.title || "", margin, yPos);
-          const dateText = `${exp.startDate || ""} - ${exp.endDate || "Present"}`;
-          pdf.setFont("helvetica", "normal");
-          pdf.text(dateText, pageWidth - margin, yPos, { align: "right" });
-          yPos += getLineHeight() + emToMm(0.1);
+          addLeftRightRows(
+            exp.title,
+            `${exp.startDate || ""} - ${exp.endDate || "Present"}`,
+            { bold: true, afterSpacingEm: 0.1 },
+          );
 
           // Company and Location - CSS: margin-bottom: 0.2em
-          pdf.setFont("helvetica", "normal");
-          pdf.text(exp.company || "", margin, yPos);
-          if (exp.location) {
-            pdf.text(exp.location, pageWidth - margin, yPos, {
-              align: "right",
-            });
-          }
-          yPos += getLineHeight() + emToMm(0.2);
+          addLeftRightRows(exp.company, exp.location, { afterSpacingEm: 0.2 });
 
-          // Description - CSS: margin: 0.15em 0 0 0, padding-left: 1.5em, li margin-bottom: 0.05em
+          // Description - CSS: margin: 0.15em 0 0 0, padding-left: 1em
           if (exp.description) {
-            const descriptionLines = exp.description
-              .split("\n")
-              .filter((line) => line.trim());
-            descriptionLines.forEach((line, lineIdx) => {
-              const cleanLine = line.trim().replace(/^[-•]\s*/, "");
-              checkPageBreak(getLineHeight());
-              pdf.text(`• ${cleanLine}`, margin + emToMm(1.5), yPos);
-              // CSS: line-height: 1.15 for list items, margin-bottom: 0.05em
-              yPos += getLineHeight() + emToMm(0.05);
-            });
-            // Add 0.15em after description list (CSS: margin: 0.15em 0 0 0)
-            yPos += emToMm(0.15);
+            addBulletList(exp.description);
           }
 
           // CSS: experience-item margin-bottom: 0.7em between items
@@ -269,50 +353,21 @@ function ResumePreview({ resumeData, sectionOrder }) {
           checkPageBreak(15);
 
           // Project Name, Technologies, and Date - CSS: margin-bottom: 0.1em
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(11);
-          let projectHeader = project.name || "";
+          let projectHeader = (project.name || "").trim();
           if (project.technologies && project.technologies.length > 0) {
             projectHeader += ` | ${project.technologies.join(", ")}`;
           }
-          // Handle long project headers that might wrap
-          const headerLines = pdf.splitTextToSize(projectHeader, maxWidth - 40); // Reserve space for date
-          headerLines.forEach((line, lineIdx) => {
-            checkPageBreak(getLineHeight());
-            pdf.text(line, margin, yPos);
-            if (lineIdx === 0 && project.startDate) {
-              const dateText = `${project.startDate} - ${project.endDate || "Present"}`;
-              pdf.setFont("helvetica", "normal");
-              pdf.text(dateText, pageWidth - margin, yPos, { align: "right" });
-            }
-            yPos += getLineHeight();
+          const projectDate = project.startDate
+            ? `${project.startDate} - ${project.endDate || "Present"}`
+            : "";
+          addLeftRightRows(projectHeader, projectDate, {
+            bold: true,
+            afterSpacingEm: 0.1,
           });
 
-          // If header wrapped, add date on next line
-          if (headerLines.length > 1 && project.startDate) {
-            const dateText = `${project.startDate} - ${project.endDate || "Present"}`;
-            pdf.setFont("helvetica", "normal");
-            pdf.text(dateText, pageWidth - margin, yPos, { align: "right" });
-            yPos += getLineHeight() + emToMm(0.1);
-          } else if (headerLines.length === 1) {
-            yPos += emToMm(0.1);
-          }
-
-          // Description - CSS: margin: 0.15em 0 0 0, padding-left: 1.5em, li margin-bottom: 0.05em
+          // Description - CSS: margin: 0.15em 0 0 0, padding-left: 1em
           if (project.description) {
-            pdf.setFont("helvetica", "normal");
-            const descriptionLines = project.description
-              .split("\n")
-              .filter((line) => line.trim());
-            descriptionLines.forEach((line, lineIdx) => {
-              const cleanLine = line.trim().replace(/^[-•]\s*/, "");
-              checkPageBreak(getLineHeight());
-              pdf.text(`• ${cleanLine}`, margin + emToMm(1.5), yPos);
-              // CSS: line-height: 1.15 for list items, margin-bottom: 0.05em
-              yPos += getLineHeight() + emToMm(0.05);
-            });
-            // Add 0.15em after description list
-            yPos += emToMm(0.15);
+            addBulletList(project.description);
           }
 
           // CSS: project-item margin-bottom: 0.7em between items
