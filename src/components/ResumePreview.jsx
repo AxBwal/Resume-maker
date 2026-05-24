@@ -1,9 +1,41 @@
 import { useRef } from "react";
 import { FiDownload } from "react-icons/fi";
 import jsPDF from "jspdf";
+import {
+  formatProfileLinkLabel,
+  normalizeProfileUrl,
+} from "../utils/profileLinks";
+
+function buildContactItems(personalInfo) {
+  const items = [];
+
+  const addText = (value) => {
+    const trimmed = (value || "").trim();
+    if (trimmed) items.push({ label: trimmed });
+  };
+
+  const addLink = (value) => {
+    const trimmed = (value || "").trim();
+    if (!trimmed) return;
+    const href = normalizeProfileUrl(trimmed);
+    if (href) {
+      items.push({ label: formatProfileLinkLabel(trimmed), href });
+    }
+  };
+
+  addText(personalInfo.phone);
+  addText(personalInfo.email);
+  addText(personalInfo.location);
+  addLink(personalInfo.linkedin);
+  addLink(personalInfo.github);
+  addLink(personalInfo.website);
+
+  return items;
+}
 
 function ResumePreview({ resumeData, sectionOrder }) {
   const resumeRef = useRef(null);
+  const contactItems = buildContactItems(resumeData.personalInfo);
 
   const exportToPDF = () => {
     const pdf = new jsPDF("p", "mm", "a4");
@@ -203,22 +235,36 @@ function ResumePreview({ resumeData, sectionOrder }) {
     yPos += 22 * 1.2 * 0.352778 + emToMm(0.2, 22);
 
     // Contact Information
-    const contactInfo = [
-      resumeData.personalInfo.phone,
-      resumeData.personalInfo.email,
-      resumeData.personalInfo.location,
-      resumeData.personalInfo.linkedin,
-      resumeData.personalInfo.github,
-      resumeData.personalInfo.website,
-    ]
-      .filter(Boolean)
-      .join(" | ");
-
-    if (contactInfo) {
+    const pdfContactItems = buildContactItems(resumeData.personalInfo);
+    if (pdfContactItems.length > 0) {
       checkPageBreak(5);
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
-      pdf.text(contactInfo, pageWidth / 2, yPos, { align: "center" });
+
+      const separator = " | ";
+      const separatorWidth = getTextWidthMm(separator, "normal", 10);
+      const itemWidths = pdfContactItems.map((item) => ({
+        ...item,
+        width: getTextWidthMm(item.label, "normal", 10),
+      }));
+      const totalWidth =
+        itemWidths.reduce((sum, item) => sum + item.width, 0) +
+        separatorWidth * (itemWidths.length - 1);
+      let xPos = (pageWidth - totalWidth) / 2;
+
+      itemWidths.forEach((item, idx) => {
+        if (item.href) {
+          pdf.textWithLink(item.label, xPos, yPos, { url: item.href });
+        } else {
+          pdf.text(item.label, xPos, yPos);
+        }
+        xPos += item.width;
+        if (idx < itemWidths.length - 1) {
+          pdf.text(separator, xPos, yPos);
+          xPos += separatorWidth;
+        }
+      });
+
       // CSS: contact-info has line-height: 1.4 (not 1.15)
       yPos += 10 * 1.4 * 0.352778; // 10pt font * 1.4 line-height
     }
@@ -478,23 +524,25 @@ function ResumePreview({ resumeData, sectionOrder }) {
               {resumeData.personalInfo.fullName || "Your Name"}
             </h1>
             <div className="contact-info">
-              {[
-                resumeData.personalInfo.phone,
-                resumeData.personalInfo.email,
-                resumeData.personalInfo.location,
-                resumeData.personalInfo.linkedin,
-                resumeData.personalInfo.github,
-                resumeData.personalInfo.website,
-              ]
-                .filter(Boolean)
-                .map((info, idx, arr) => (
-                  <span key={idx}>
-                    {info}
-                    {idx < arr.length - 1 && (
-                      <span className="contact-separator"> | </span>
-                    )}
-                  </span>
-                ))}
+              {contactItems.map((item, idx) => (
+                <span key={idx}>
+                  {item.href ? (
+                    <a
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="contact-link"
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    item.label
+                  )}
+                  {idx < contactItems.length - 1 && (
+                    <span className="contact-separator"> | </span>
+                  )}
+                </span>
+              ))}
             </div>
           </div>
 
