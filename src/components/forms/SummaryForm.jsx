@@ -5,10 +5,11 @@ function SummaryForm({ data, updateData }) {
       <div className="form-group">
         <label>Summary</label>
         <textarea
+          className="description-textarea"
           value={data || ''}
           onChange={(e) => updateData(e.target.value)}
           placeholder="Write a brief professional summary highlighting your key qualifications, experience, and career goals..."
-          rows={8}
+          rows={10}
         />
       </div>
     </div>
